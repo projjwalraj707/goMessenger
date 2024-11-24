@@ -11,21 +11,8 @@ import (
 const certFileName = "certificate.crt" //certificate file name of SSL certificate
 const keyFileName = "private.key" // private key of the certificate
 
-type Message struct { //stores each of the messages along with the name of the sender
-	Sender string `json: "sender"` //sender of the text message
-	Text string `json: "text"` //the text message
-}
-
-var dataBase = make(map[string] []Message) //maps recipient's name to a Message slice containing all the messages he/she has received.
-
 func main() { //main function from where the execution starts
 	mux := http.NewServeMux()
-
-	//handle all routes
-	mux.HandleFunc("/", handleRoot)
-	mux.HandleFunc("POST /{user}/msg", sendMsg)
-	mux.HandleFunc("GET /{user}/retrieveMsg", retrieveMsg)
-
 	srv := &http.Server{ //configure the server
 		Addr: ":8080", //port number
 		Handler: mux,
@@ -35,6 +22,12 @@ func main() { //main function from where the execution starts
 			CurvePreferences: []tls.CurveID{}, // leave it empty so that kyber is chosen whenever both client and server support it.
 		},
 	}
+
+	//handle all routes
+	mux.HandleFunc("/", handleRoot) //shows details about the connection
+	mux.HandleFunc("POST /{user}/msg", sendMsg) //this route can be used to send a message
+	mux.HandleFunc("GET /{user}/retrieveMsg", retrieveMsg) //this route can be used to read all the messages for {user}
+
 	fmt.Println("Server started on port: ", srv.Addr)
 	srv.ListenAndServeTLS(certFileName, keyFileName)
 }
@@ -42,17 +35,22 @@ func main() { //main function from where the execution starts
 func handleRoot(w http.ResponseWriter, r *http.Request,) { // handle the request coming to the root i.e. "localhost:8080/"
 	if r.TLS != nil {
 		//state := r.TLS
+		fmt.Fprintf(w, "Hello World\n")
+		curveID, _ := getRequestCurveID(r)
+		if curveID == 0x6399 {
+			fmt.Fprintf(w, "The TLS connection is Quantum Resistant.\n")
+		} else {
+			fmt.Fprintf(w, "The TLS connection is NOT Quantum Resistant.\n")
+		}
+		//curveIDName, _ := getTlsCurveIDName(curveID)
+		//fmt.Fprintf(w, "CurveIdName is: %v\n", curveIDName)
 
 	} else {
 		fmt.Fprintf(w, "Non-TLS connection\n")
 	}
-
-	curveID, _ := getRequestCurveID(r)
-	curveIDName, _ := getTlsCurveIDName(curveID)
-	fmt.Fprintf(w, "Hello World\n")
-	fmt.Fprintf(w, "CurveIdName is: %v\n", curveIDName)
 }
 
+/* delete this function
 func getTlsCurveIDName(curveID tls.CurveID) (string, error) {
 	curveName := ""
 	switch curveID {
@@ -71,11 +69,11 @@ func getTlsCurveIDName(curveID tls.CurveID) (string, error) {
 	}
 	return curveName, nil
 }
+*/
 
 func getRequestCurveID(r *http.Request) (tls.CurveID, error) {
 	// Access the private 'testingOnlyCurveID' field using reflection
-	connectionState := reflect.ValueOf(*r.TLS)
-	//connectionState := *r.TLS
+	connectionState := reflect.ValueOf(*r.TLS) //ConnectionState struct can be found at https://github.com/golang/go/blob/master/src/crypto/tls/common.go
 	curveIDField := connectionState.FieldByName("testingOnlyCurveID")
 
 	if !curveIDField.IsValid() {
@@ -85,6 +83,20 @@ func getRequestCurveID(r *http.Request) (tls.CurveID, error) {
 	// Convert the reflected value to tls.CurveID
 	return tls.CurveID(curveIDField.Uint()), nil
 }
+
+
+
+
+
+
+
+//Extra functionalities
+type Message struct { //stores each of the messages along with the name of the sender
+	Sender string `json: "sender"` //sender of the text message
+	Text string `json: "text"` //the text message
+}
+
+var dataBase = make(map[string] []Message) //maps recipient's name to a Message slice containing all the messages he/she has received.
 
 func sendMsg(w http.ResponseWriter, r *http.Request, ) { //handles POST request at /sender/msg to send msg
 	sender := r.PathValue("user") // current user is the sender of the message
