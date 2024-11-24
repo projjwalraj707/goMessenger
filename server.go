@@ -1,59 +1,48 @@
 package main
 
 import (
-	"fmt"
-	"net/http"
-	"encoding/json"
-	"crypto/tls"
-	"reflect"
+	"fmt" // for printing and formatting related functions
+	"net/http" // to create http server
+	"encoding/json" //to handle JSON format data
+	"crypto/tls" // to add tls suppport
+	"reflect" // to work with unknown data types
 )
 
-const certFileName = "certificate.crt"
-const keyFileName = "private.key"
+const certFileName = "certificate.crt" //certificate file name of SSL certificate
+const keyFileName = "private.key" // private key of the certificate
 
 type Message struct { //stores each of the messages along with the name of the sender
 	Sender string `json: "sender"` //sender of the text message
 	Text string `json: "text"` //the text message
 }
 
-var dataBase = make(map[string] []Message) //maps recipient's name to a Message slice containing all the messages he has received.
+var dataBase = make(map[string] []Message) //maps recipient's name to a Message slice containing all the messages he/she has received.
 
-func main() {
+func main() { //main function from where the execution starts
 	mux := http.NewServeMux()
-
-	//configure TLS
-	cfg := &tls.Config {
-		MaxVersion: tls.VersionTLS13,
-		MinVersion: tls.VersionTLS13,
-		CurvePreferences: []tls.CurveID{}, // leave it empty so that kyber is chosen whenever both client and server support it.
-	}
 
 	//handle all routes
 	mux.HandleFunc("/", handleRoot)
 	mux.HandleFunc("POST /{user}/msg", sendMsg)
 	mux.HandleFunc("GET /{user}/retrieveMsg", retrieveMsg)
 
-	srv := &http.Server{
-		Addr: ":8080",
+	srv := &http.Server{ //configure the server
+		Addr: ":8080", //port number
 		Handler: mux,
-		TLSConfig: cfg,
+		TLSConfig: &tls.Config { //cofigure TLS
+			MaxVersion: tls.VersionTLS13,
+			MinVersion: tls.VersionTLS13,
+			CurvePreferences: []tls.CurveID{}, // leave it empty so that kyber is chosen whenever both client and server support it.
+		},
 	}
 	fmt.Println("Server started on port: ", srv.Addr)
 	srv.ListenAndServeTLS(certFileName, keyFileName)
 }
 
-func handleRoot( //handles GET request at "/"
-	w http.ResponseWriter, //sends response and header
-	r *http.Request, //contains the request
-) {
+func handleRoot(w http.ResponseWriter, r *http.Request,) { // handle the request coming to the root i.e. "localhost:8080/"
 	if r.TLS != nil {
-		state := r.TLS
-		fmt.Fprintf(w, "TLS Version: %x\n", state.Version)
-		fmt.Fprintf(w, "Cipher Suite: %x\n", state.CipherSuite)
-		fmt.Fprintf(w, "Handshake Complete?: %t\n", state.HandshakeComplete)
+		//state := r.TLS
 
-		// CurveID (not directly exposed, but inferred from CipherSuite)
-		fmt.Fprintf(w, "Server Name: %s\n", state.ServerName)
 	} else {
 		fmt.Fprintf(w, "Non-TLS connection\n")
 	}
@@ -84,13 +73,10 @@ func getTlsCurveIDName(curveID tls.CurveID) (string, error) {
 }
 
 func getRequestCurveID(r *http.Request) (tls.CurveID, error) {
-	if r.TLS == nil {
-		return 0, fmt.Errorf("the request is not a TLS connection")
-	}
-
 	// Access the private 'testingOnlyCurveID' field using reflection
-	connState := reflect.ValueOf(*r.TLS)
-	curveIDField := connState.FieldByName("testingOnlyCurveID")
+	connectionState := reflect.ValueOf(*r.TLS)
+	//connectionState := *r.TLS
+	curveIDField := connectionState.FieldByName("testingOnlyCurveID")
 
 	if !curveIDField.IsValid() {
 		return 0, fmt.Errorf("the curve ID field is not found")
