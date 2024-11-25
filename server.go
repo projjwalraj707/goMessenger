@@ -19,7 +19,12 @@ func main() { //main function from where the execution starts
 		TLSConfig: &tls.Config { //cofigure TLS
 			MaxVersion: tls.VersionTLS13,
 			MinVersion: tls.VersionTLS13,
-			CurvePreferences: []tls.CurveID{}, // leave it empty so that kyber is chosen whenever both client and server support it.
+			CurvePreferences: []tls.CurveID{
+				//in GO 1.23.3 the default CurveID is X25519Kyber768Draft00 but it will be removed in upcoming version of Go (1.24).
+				//Also all major browsers are ending support for X25519Kyber768Draft00. When Golang 1.24 is released (most probably in Feb 2025),
+				//uncomment the next line MLKEM will automatically be enabled.
+				//tls.X25519MLKEM768,
+			},
 		},
 	}
 
